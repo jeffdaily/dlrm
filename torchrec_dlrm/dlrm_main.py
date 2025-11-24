@@ -36,7 +36,10 @@ from torchrec.optim.keyed import CombinedOptimizer, KeyedOptimizerWrapper
 from torchrec.optim.optimizers import in_backward_optimizer_filter
 from tqdm import tqdm
 
-from distributed_shampoo import DistributedShampoo, SGDPreconditionerConfig
+try:
+    from distributed_shampoo import DistributedShampoo, SGDPreconditionerConfig
+except ImportError:
+    pass
 
 # OSS import
 try:
