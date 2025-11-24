@@ -36,8 +36,6 @@ from torchrec.optim.keyed import CombinedOptimizer, KeyedOptimizerWrapper
 from torchrec.optim.optimizers import in_backward_optimizer_filter
 from tqdm import tqdm
 
-from torch.profiler import profile, ProfilerActivity, record_function
-activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
 from distributed_shampoo import DistributedShampoo, SGDPreconditionerConfig
 
 # OSS import
@@ -393,7 +391,6 @@ def batched(it: Iterator, n: int):
 
 
 def _train(
-    prof,
     pipeline: TrainPipelineSparseDist,
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
@@ -450,8 +447,6 @@ def _train(
                         print(f"lr: {it} {i} {g['lr']:.6f}")
                 pipeline.progress(batched_iterator)
                 lr_scheduler.step()
-                if prof:
-                    prof.step()
                 if is_rank_zero:
                     pbar.update(1)
             except StopIteration:
@@ -472,7 +467,6 @@ class TrainValTestResults:
 
 
 def train_val_test(
-    prof,
     args: argparse.Namespace,
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -505,7 +499,6 @@ def train_val_test(
 
     for epoch in range(args.epochs):
         _train(
-            prof,
             pipeline,
             train_dataloader,
             val_dataloader,
@@ -525,7 +518,7 @@ def train_val_test(
     return results
 
 
-def main(prof, argv: list[str]) -> None:
+def main(argv: list[str]) -> None:
     """
     Trains, validates, and tests a Deep Learning Recommendation Model (DLRM)
     (https://arxiv.org/abs/1906.00091). The DLRM model contains both data parallel
@@ -772,7 +765,6 @@ def main(prof, argv: list[str]) -> None:
         val_dataloader = RestartableMap(multihot.convert_to_multi_hot, val_dataloader)
         test_dataloader = RestartableMap(multihot.convert_to_multi_hot, test_dataloader)
     train_val_test(
-        prof,
         args,
         model,
         optimizer,
@@ -786,15 +778,9 @@ def main(prof, argv: list[str]) -> None:
         multihot.save_freqs_stats()
 
 
-def invoke_main(prof) -> None:
-    main(prof, sys.argv[1:])
+def invoke_main() -> None:
+    main(sys.argv[1:])
 
-
-def trace_handler(prof):
-  prof.export_chrome_trace(f"torchrec_dlrm_small_rank_{dist.get_rank()}_{prof.step_num}.json")
 
 if __name__ == "__main__":
-    #my_schedule = torch.profiler.schedule(wait=0, warmup=0, active=100, repeat=1)
-    #with profile(schedule=my_schedule, activities=activities, record_shapes=True, on_trace_ready=trace_handler) as prof:
-    #    invoke_main(prof)  # pragma: no cover
-    invoke_main(None)  # pragma: no cover
+    invoke_main()  # pragma: no cover
